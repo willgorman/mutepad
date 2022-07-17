@@ -21,10 +21,16 @@ var (
 )
 
 func main() {
+	// TODO: (willgorman) if we can't open, then just retry a bit later
+	// so that we can keep running the controller even when the macropad
+	// is disconnected and just connect when it comes back
 	term, err := term.Open("/dev/cu.usbmodem141203", term.Speed(115200))
 	if err != nil {
 		panic(err)
 	}
+	// if we don't set a read timeout then term.Close() blocks
+	// until some input comes in from the device so we can't shut
+	// down if the device never sends anything else
 	err = term.SetReadTimeout(1 * time.Second)
 	if err != nil {
 		panic(err)
