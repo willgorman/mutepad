@@ -15,7 +15,10 @@ import (
 	"github.com/vrecan/death/v3"
 )
 
-var mutex = &sync.Mutex{}
+var (
+	mutex       = &sync.Mutex{}
+	termReading = &sync.Mutex{}
+)
 
 func main() {
 	term, err := term.Open("/dev/cu.usbmodem141203", term.Speed(115200))
@@ -32,7 +35,9 @@ func main() {
 		for {
 			b := make([]byte, 6)
 			// log.Println("reading")
+			termReading.Lock()
 			_, err = term.Read(b)
+			termReading.Unlock()
 			// log.Println("read")
 			if errors.Is(err, io.EOF) {
 				continue
@@ -55,7 +60,7 @@ func main() {
 				}
 			}
 			mutex.Unlock()
-			fmt.Println(string(b))
+			// fmt.Println(string(b))
 		}
 	}()
 
@@ -68,7 +73,7 @@ func main() {
 			if isMuted() {
 				msg = "off"
 			}
-			log.Println(msg)
+			// log.Println(msg)
 			_, err = term.Write([]byte(msg))
 			if err != nil {
 				panic(err)
@@ -77,22 +82,24 @@ func main() {
 		}
 	}()
 
-	log.Println("waiting")
+	// log.Println("waiting")
 	reaper := death.NewDeath(syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
 	err = reaper.WaitForDeath()
 	log.Println("death is here")
 	if err != nil {
 		panic(err)
 	}
-	log.Println("mutex")
-	mutex.Lock() // check the lock to make sure we don't halt mid write
-	log.Println("close")
+	// log.Println("mutex")
+	mutex.Lock()       // check the lock to make sure we don't halt mid write
+	termReading.Lock() // check the lock to make sure we don't close during a read
+	// log.Println("close")
 	err = term.Close()
 	if err != nil {
 		panic(err)
 	}
 	log.Println("bye!")
 	mutex.Unlock()
+	termReading.Unlock()
 }
 
 func isMuted() bool {
@@ -100,8 +107,8 @@ func isMuted() bool {
 	if err != nil {
 		log.Println(err)
 	}
-	log.Printf("level " + string(output) + "\n")
-	log.Printf("muted %t\n", string(output) == "0")
+	// log.Printf("level " + string(output) + "\n")
+	// log.Printf("muted %t\n", string(output) == "0")
 	return strings.TrimSpace(string(output)) == "0"
 }
 
@@ -122,7 +129,7 @@ func setLevel(level int) error {
 	if level > 100 {
 		level = 100
 	}
-	log.Printf("setting level %d\n", level)
+	// log.Printf("setting level %d\n", level)
 	command := fmt.Sprintf("set volume input volume %d", level)
 	_, err := exec.Command("osascript", "-e", command).Output()
 	if err != nil {
